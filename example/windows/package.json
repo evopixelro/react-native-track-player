@@ -1,0 +1,28 @@
+{
+  "name": "react-native-track-player-windows-example",
+  "version": "0.0.1",
+  "private": true,
+  "scripts": {
+    "start": "react-native start",
+    "windows": "react-native run-windows --arch x64",
+    "build": "react-native run-windows --arch x64 --release --no-launch --no-deploy --no-packager",
+    "bundle": "react-native bundle --platform windows --entry-file index.js --dev false --bundle-output build/index.windows.bundle --assets-dest build"
+  },
+  "dependencies": {
+    "@evopixel/react-native-track-player": "link:../..",
+    "react": "19.2.3",
+    "react-native": "0.84.1",
+    "react-native-windows": "0.84.0"
+  },
+  "devDependencies": {
+    "@babel/core": "^7.29.7",
+    "@types/react": "19.2.2",
+    "@react-native-community/cli": "20.2.0",
+    "@react-native/babel-preset": "0.84.1",
+    "@react-native/metro-config": "0.84.1"
+  },
+  "engines": {
+    "node": "^22.13.0 || >=24.3.0"
+  },
+  "packageManager": "yarn@1.22.22"
+}

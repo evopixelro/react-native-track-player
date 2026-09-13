@@ -1,0 +1,225 @@
+name: validate
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+    types: [opened, synchronize, reopened]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  check-library:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest, macos-latest]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .node-version
+      - name: Install Yarn Classic
+        run: npm install --global yarn@1.22.22
+      - name: Install Dependencies
+        run: yarn install --frozen-lockfile --non-interactive
+      - name: Check Types, Lint, Tests and Build
+        run: npm run check
+      - name: Install Example Dependencies
+        run: yarn --cwd example install --frozen-lockfile --non-interactive
+      - name: Check Example Types, Lint and Tests
+        run: npm run check:example
+      - name: Check Windows queue logic
+        if: runner.os != 'Windows'
+        run: npm run test:windows
+      - name: Build Web example
+        if: runner.os == 'Linux'
+        run: npm --prefix example run build:web
+
+  build-windows:
+    runs-on: windows-2025-vs2026
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22.13.0'
+      - uses: microsoft/setup-msbuild@v2
+      - name: Install the Windows example dependencies
+        shell: pwsh
+        run: |
+          npm install --global yarn@1.22.22
+          yarn install --frozen-lockfile --non-interactive
+          yarn --cwd example install --frozen-lockfile --non-interactive
+          yarn --cwd example/windows install --frozen-lockfile --non-interactive
+      - name: Autolink and bundle the Windows example
+        working-directory: example/windows
+        run: |
+          npx react-native autolink-windows --no-telemetry
+          npm run bundle
+      - name: Build the native Windows example and module
+        shell: pwsh
+        run: |
+          $rnwPath = "$env:GITHUB_WORKSPACE/example/windows/node_modules/react-native-windows/"
+          $sdk = Get-ChildItem 'C:/Program Files (x86)/Windows Kits/10/Include' -Directory | Where-Object Name -Match '^10\.0\.' | Sort-Object { [version]$_.Name } -Descending | Select-Object -First 1 -ExpandProperty Name
+          msbuild example/windows/native/TrackPlayerExample.sln /restore /m:2 /p:Configuration=Release /p:Platform=x64 "/p:ReactNativeWindowsDir=$rnwPath" "/p:WindowsTargetPlatformVersion=$sdk" "/p:TargetPlatformVersion=$sdk" /p:AppxPackageSigningEnabled=false /p:RunCodegenWindows=false
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: windows-native-build
+          path: |
+            windows/**/Release/**/*.dll
+            windows/**/Release/**/*.winmd
+            example/windows/native/**/Release/**
+          if-no-files-found: ignore
+
+  build-ios-example:
+    strategy:
+      fail-fast: false
+      matrix:
+        react-native: ['0.86.3', '0.87.1']
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .node-version
+      - name: Install JavaScript dependencies
+        run: |
+          npm install --global yarn@1.22.22
+          yarn install --frozen-lockfile --non-interactive
+          yarn --cwd example install --frozen-lockfile --non-interactive
+      - name: Prepare the React Native 0.87 compatibility fixture
+        if: matrix.react-native == '0.87.1'
+        run: |
+          yarn --cwd example add --exact react-native@0.87.1 react-native-gesture-handler@3.3.0
+          yarn --cwd example add --dev --exact @react-native/babel-preset@0.87.1 @react-native/jest-preset@0.87.1 @react-native/metro-config@0.87.1 @react-native/typescript-config@0.87.1
+          npm run check:example
+      - uses: ruby/setup-ruby@v1
+        with:
+          ruby-version: '3.3'
+          working-directory: example
+      - name: Install Ruby dependencies
+        working-directory: example
+        run: |
+          bundle config set --local path vendor/bundle
+          bundle config set --local frozen true
+          bundle install
+      - name: Install native dependencies
+        working-directory: example/ios
+        env:
+          RN_VERSION: ${{ matrix.react-native }}
+        run: |
+          if [ "$RN_VERSION" = '0.87.1' ]; then
+            bundle exec pod update
+          else
+            bundle exec pod install --deployment
+          fi
+      - name: Build iOS simulator example
+        run: xcodebuild -workspace example/ios/TrackPlayerExample.xcworkspace -scheme TrackPlayerExample -configuration Debug -sdk iphonesimulator -destination 'generic/platform=iOS Simulator' -derivedDataPath "$RUNNER_TEMP/rntp-ios" CODE_SIGNING_ALLOWED=NO build
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: ios-example-lockfiles-${{ matrix.react-native }}
+          path: |
+            example/ios/Podfile.lock
+            example/Gemfile.lock
+
+  build-android-example:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        react-native: ['0.86.3', '0.87.1']
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .node-version
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - uses: android-actions/setup-android@v3
+      - name: Install JavaScript dependencies
+        run: |
+          npm install --global yarn@1.22.22
+          yarn install --frozen-lockfile --non-interactive
+          yarn --cwd example install --frozen-lockfile --non-interactive
+      - name: Prepare the React Native 0.87 compatibility fixture
+        if: matrix.react-native == '0.87.1'
+        run: |
+          yarn --cwd example add --exact react-native@0.87.1 react-native-gesture-handler@3.3.0
+          yarn --cwd example add --dev --exact @react-native/babel-preset@0.87.1 @react-native/jest-preset@0.87.1 @react-native/metro-config@0.87.1 @react-native/typescript-config@0.87.1
+          node <<'NODE'
+          const fs = require('node:fs');
+          const build = 'example/android/build.gradle';
+          fs.writeFileSync(build, fs.readFileSync(build, 'utf8')
+            .replace('buildToolsVersion = "36.0.0"', 'buildToolsVersion = "37.0.0"')
+            .replace('compileSdkVersion = 36', 'compileSdkVersion = 37')
+            .replace('kotlinVersion = "2.1.20"', 'kotlinVersion = "2.2.0"'));
+          fs.appendFileSync('example/android/gradle.properties', '\nandroid.builtInKotlin=false\nandroid.newDsl=false\n');
+          const wrapper = 'example/android/gradle/wrapper/gradle-wrapper.properties';
+          fs.writeFileSync(wrapper, fs.readFileSync(wrapper, 'utf8').replace('gradle-9.3.1-', 'gradle-9.4.1-'));
+          NODE
+      - name: Install Android SDKs
+        env:
+          RN_VERSION: ${{ matrix.react-native }}
+        run: |
+          sdkmanager 'platforms;android-36' 'build-tools;36.0.0' 'ndk;27.1.12297006' 'cmake;3.22.1'
+          if [ "$RN_VERSION" = '0.87.1' ]; then
+            sdkmanager 'platforms;android-37.0' 'build-tools;37.0.0'
+          fi
+      - name: Build the Android example and native module
+        working-directory: example/android
+        run: bash gradlew assembleDebug -PreactNativeArchitectures=arm64-v8a --no-daemon --max-workers=2
+
+  build-macos-example:
+    timeout-minutes: 45
+    runs-on: macos-latest
+    env:
+      RCT_NEW_ARCH_ENABLED: '1'
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .node-version
+      - name: Check native macOS commands and queue behavior
+        run: npm run test:macos
+      - name: Install JavaScript dependencies
+        run: |
+          npm install --global yarn@1.22.22
+          yarn install --frozen-lockfile --non-interactive
+          yarn --cwd example install --frozen-lockfile --non-interactive
+          yarn --cwd example/macos install --frozen-lockfile --non-interactive
+      - name: Bundle the macOS example
+        run: npm --prefix example run bundle:macos
+      - uses: ruby/setup-ruby@v1
+        with:
+          ruby-version: '3.3'
+          working-directory: example
+      - name: Install Ruby dependencies
+        working-directory: example
+        run: |
+          bundle config set --local path vendor/bundle
+          bundle config set --local frozen true
+          bundle install
+      - name: Install macOS native dependencies
+        working-directory: example/macos/macos
+        run: bundle exec pod install --deployment
+      - name: Build the macOS example and TurboModule
+        run: npm --prefix example run build:macos
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: macos-native-build
+          path: |
+            example/macos/macos/Podfile.lock
+            example/macos/build/Build/Products/Release/TrackPlayerExample.app
+          if-no-files-found: ignore

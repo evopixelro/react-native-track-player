@@ -1,0 +1,28 @@
+{
+  "name": "react-native-track-player-macos-example",
+  "version": "0.0.1",
+  "private": true,
+  "scripts": {
+    "start": "react-native start",
+    "macos": "react-native run-macos --scheme TrackPlayerExample-macOS",
+    "build": "xcodebuild -workspace macos/TrackPlayerExample.xcworkspace -scheme TrackPlayerExample-macOS -configuration Release -destination 'platform=macOS' -derivedDataPath build CODE_SIGNING_ALLOWED=NO build",
+    "bundle": "react-native bundle --platform macos --entry-file index.js --dev false --bundle-output build/index.macos.bundle --assets-dest build"
+  },
+  "dependencies": {
+    "@evopixel/react-native-track-player": "link:../..",
+    "react": "19.1.4",
+    "react-native": "0.81.6",
+    "react-native-macos": "0.81.9"
+  },
+  "devDependencies": {
+    "@babel/core": "^7.29.7",
+    "@react-native-community/cli": "20.2.0",
+    "@react-native-community/cli-platform-ios": "20.2.0",
+    "@react-native/babel-preset": "0.81.6",
+    "@react-native/metro-config": "0.81.6"
+  },
+  "engines": {
+    "node": "^20.19.4 || ^22.13.0 || >=24.3.0"
+  },
+  "packageManager": "yarn@1.22.22"
+}

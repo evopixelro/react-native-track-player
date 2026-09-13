@@ -1,0 +1,6 @@
+#!/usr/bin/env sh
+. "$(dirname -- "$0")/_/husky.sh"
+
+if [ -z "$2" ] && [ -t 0 ]; then
+  exec < /dev/tty && node ./node_modules/commitizen/bin/git-cz --hook || true
+fi

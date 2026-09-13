@@ -1,0 +1,11 @@
+*.pbxproj -text
+# specific for windows script files
+*.bat text eol=crlf
+
+# EvoPixel JavaScript and TypeScript sources use consistent line endings
+*.js text eol=lf
+*.jsx text eol=lf
+*.ts text eol=lf
+*.tsx text eol=lf
+*.mjs text eol=lf
+*.cjs text eol=lf
