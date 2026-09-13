@@ -1,0 +1,108 @@
+---
+sidebar_position: 1
+---
+
+import Tabs from '@theme/Tabs';
+import TabItem from '@theme/TabItem';
+
+# Installation
+
+
+## Stable
+
+<Tabs groupId="pkg">
+  <TabItem value="npm" label="NPM" default>
+
+    npm install @evopixel/react-native-track-player
+
+  </TabItem>
+  <TabItem value="yarn" label="Yarn">
+
+    yarn add @evopixel/react-native-track-player
+
+  </TabItem>
+</Tabs>
+
+This documentation describes version 5.0.4 of the EvoPixel fork. Do not install
+it alongside the original package: both register the same native module.
+Commit your application's lockfile for repeatable installs.
+
+## Migrating from 4.1.2
+
+Follow the [v5 migration guide](../v5-migration.md) when replacing the original
+4.1.2 package. This fork does not publish automatic nightly releases.
+
+## React Native Compatibility
+
+The New Architecture is required. Android/iOS builds are checked with React
+Native 0.86.3 and 0.87.1. Use the matching native template and build tools for
+your application's React Native version. Node.js 20.19.4+ is supported with
+React Native 0.86.3; React Native 0.87.1 requires Node.js 22.13+ or 24.3+.
+Desktop targets use the separate framework versions listed below.
+
+## iOS Setup
+
+iOS requires a few extra steps that are _not_ required for Android/Web.
+
+### Enable Swift Modules
+
+The iOS module uses Swift. Current Swift-based React Native templates already
+include Swift support. Only older Objective-C application targets without any
+Swift files need this extra step: add a file such as `dummy.swift` to the Xcode
+target and accept the bridging-header prompt if Xcode presents it.
+
+![Importing Swift](../../static/img/ios-swift-bridging-header.png)
+
+### Enable Background Audio (if desired)
+
+Please read the section on [Background Modes](./background-mode.md#ios) if you
+intend for audio to play while in the background on your app.
+
+### Pod Install
+
+You'll need to run a `pod install` in order to install the native iOS dependencies
+
+```sh
+cd ios
+bundle exec pod install
+```
+
+## Web Setup
+
+RNTP is available on web. The web implementation leverages [shaka-player](https://github.com/shaka-project/shaka-player)
+which is an optional peer dependency of the RNTP. If you want to deploy the web
+platform you'll need to install `shaka-player` directly in your project:
+
+<Tabs groupId="pkg">
+  <TabItem value="npm" label="NPM" default>
+
+    npm install --save shaka-player@^4.7.9
+
+  </TabItem>
+  <TabItem value="yarn" label="Yarn">
+
+    yarn add shaka-player@^4.7.9
+
+  </TabItem>
+</Tabs>
+
+The supported Shaka 4 releases include transmuxing support; a separate `mux.js`
+installation is not required. Browser codec support, autoplay policy and CORS
+still apply. See [HLS troubleshooting](../troubleshooting.md#web-issues-with-hls-streams)
+and [Platform Support](./platform-support.md) for browser-specific limits.
+
+## Desktop Setup
+
+For desktop applications, follow the [Windows](./windows.md) or
+[macOS](./macos.md) guide. Each platform uses its own matching React Native
+dependencies and native build tools.
+
+## Expo
+
+You can now use React Native Track Player with Expo.
+
+Use a native development or release build, including EAS Build. Expo Go cannot
+load this native module. EAS builds use the native configuration in your
+application; this package does not create an Expo project or configure signing.
+
+For more information, see [Developing with Expo](../guides/with-expo.md).
